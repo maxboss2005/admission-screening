@@ -1,9 +1,7 @@
 import streamlit as st
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-import io
+import base64
 
-# WAEC/NECO Grade to Point Mapping
+# Grade-to-point mapping
 grade_points = {
     'A1': 10, 'B2': 9, 'B3': 8,
     'C4': 7, 'C5': 6, 'C6': 5,
@@ -12,25 +10,25 @@ grade_points = {
 
 st.title("University Screening Score Calculator")
 
+# Candidate Info
 st.subheader("Candidate Information")
 name = st.text_input("Full Name")
 jamb_number = st.text_input("JAMB Registration Number")
 course = st.text_input("Course of Interest")
 
+# JAMB Input
 st.subheader("JAMB Scores (English is compulsory)")
 jamb_subjects = []
 jamb_scores = []
 
-# English is compulsory
 english_score = st.number_input("English", min_value=0, max_value=100, value=0)
 jamb_subjects.append("English")
 jamb_scores.append(english_score)
 
-# Other 3 subjects
 for i in range(3):
-    subject = st.text_input(f"Subject {i+2} Name")
-    score = st.number_input(f"{subject} Score", min_value=0, max_value=100, value=0, key=f"jamb{i}")
-    jamb_subjects.append(subject)
+    subj = st.text_input(f"Subject {i+2} Name")
+    score = st.number_input(f"{subj} Score", min_value=0, max_value=100, value=0, key=f"jamb{i}")
+    jamb_subjects.append(subj)
     jamb_scores.append(score)
 
 total_jamb = sum(jamb_scores)
@@ -42,18 +40,16 @@ st.write(f"JAMB Screening Score: {jamb_percentage}%")
 if total_jamb < 195:
     st.error("You must score at least 195 in JAMB to be eligible for screening.")
 else:
-    st.subheader("WAEC/NECO Results (5 Relevant Subjects)")
-
+    st.subheader("WAEC/NECO Results (5 Subjects)")
     waec_subjects = []
     waec_grades = []
     waec_points = []
 
     for i in range(5):
-        subject = st.text_input(f"WAEC/NECO Subject {i+1}")
-        grade = st.selectbox(f"Grade for {subject}", list(grade_points.keys()), key=f"grade{i}")
+        subj = st.text_input(f"WAEC/NECO Subject {i+1}")
+        grade = st.selectbox(f"Grade for {subj}", list(grade_points.keys()), key=f"waec{i}")
         point = grade_points[grade]
-
-        waec_subjects.append(subject)
+        waec_subjects.append(subj)
         waec_grades.append(grade)
         waec_points.append(point)
 
@@ -67,58 +63,60 @@ else:
     st.subheader(f"Aggregate Score: {aggregate_score}%")
 
     if aggregate_score >= 50:
-        success_message = f"🎉 Congratulations, {name} with JAMB number {jamb_number} is qualified to register into Lagos State University with the aggregate score of {aggregate_score}%."
-        st.success(success_message)
+        st.success(f"🎉 Congratulations, {name} with JAMB number {jamb_number} is qualified to register into Lagos State University with the aggregate score of {aggregate_score}%.")
 
-        # PDF generation using reportlab
-        buffer = io.BytesIO()
-        pdf = canvas.Canvas(buffer, pagesize=A4)
-        width, height = A4
+        # HTML result string with inline print button and styling
+        html_result = f"""
+        <html>
+        <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; padding: 20px; }}
+            h2 {{ color: darkgreen; }}
+            ul {{ padding-left: 20px; }}
+            button.print-btn {{
+                background-color: #4CAF50;
+                color: white;
+                padding: 10px 20px;
+                margin-bottom: 20px;
+                border: none;
+                cursor: pointer;
+                font-size: 16px;
+                border-radius: 5px;
+            }}
+        </style>
+        </head>
+        <body>
+        <button class="print-btn" onclick="window.print()">🖨️ Print Result</button>
+        <h2>Lagos State University Screening Result</h2>
+        <p><strong>Name:</strong> {name}</p>
+        <p><strong>JAMB Number:</strong> {jamb_number}</p>
+        <p><strong>Course of Interest:</strong> {course}</p>
+        <hr>
+        <h3>JAMB Scores</h3>
+        <ul>
+        {''.join([f'<li>{subj}: {score}</li>' for subj, score in zip(jamb_subjects, jamb_scores)])}
+        </ul>
+        <p><strong>JAMB Screening Score:</strong> {jamb_percentage}%</p>
 
-        y = height - 50
-        pdf.setFont("Helvetica-Bold", 16)
-        pdf.drawCentredString(width / 2, y, "Lagos State University Screening Result")
+        <h3>WAEC/NECO Grades</h3>
+        <ul>
+        {''.join([f'<li>{subj}: {grade} ({grade_points[grade]} points)</li>' for subj, grade in zip(waec_subjects, waec_grades)])}
+        </ul>
+        <p><strong>WAEC Score:</strong> {waec_percentage}%</p>
 
-        y -= 40
-        pdf.setFont("Helvetica", 12)
-        pdf.drawString(50, y, f"Name: {name}")
-        y -= 20
-        pdf.drawString(50, y, f"JAMB Number: {jamb_number}")
-        y -= 20
-        pdf.drawString(50, y, f"Course of Interest: {course}")
+        <h3>Aggregate Score: {aggregate_score}%</h3>
+        <h3 style='color:green;'>Congratulations, you are qualified for admission!</h3>
+        </body>
+        </html>
+        """
 
-        y -= 30
-        pdf.setFont("Helvetica-Bold", 14)
-        pdf.drawString(50, y, "JAMB Scores:")
-        pdf.setFont("Helvetica", 12)
-        for subj, score in zip(jamb_subjects, jamb_scores):
-            y -= 20
-            pdf.drawString(70, y, f"{subj}: {score}")
-        y -= 20
-        pdf.drawString(70, y, f"JAMB Score (%): {jamb_percentage}")
+        # Show preview in Streamlit
+        st.components.v1.html(html_result, height=600, scrolling=True)
 
-        y -= 30
-        pdf.setFont("Helvetica-Bold", 14)
-        pdf.drawString(50, y, "WAEC/NECO Grades:")
-        pdf.setFont("Helvetica", 12)
-        for subj, grade, point in zip(waec_subjects, waec_grades, waec_points):
-            y -= 20
-            pdf.drawString(70, y, f"{subj}: {grade} ({point} points)")
-        y -= 20
-        pdf.drawString(70, y, f"WAEC Score (%): {waec_percentage}")
+        # Offer HTML as downloadable file
+        b64 = base64.b64encode(html_result.encode()).decode()
+        href = f'<a href="data:text/html;base64,{b64}" download="screening_result.html">📥 Download Result as HTML</a>'
+        st.markdown(href, unsafe_allow_html=True)
 
-        y -= 30
-        pdf.setFont("Helvetica-Bold", 14)
-        pdf.drawString(50, y, f"Aggregate Score: {aggregate_score}%")
-
-        pdf.save()
-        buffer.seek(0)
-
-        st.download_button(
-            label="📄 Download Result as PDF",
-            data=buffer,
-            file_name="screening_result.pdf",
-            mime="application/pdf"
-        )
     else:
-        st.error("Sorry, you are not qualified for admission as your aggregate score is below 50%.")
+        st.error("Sorry, your aggregate score is below 50%. You are not qualified.")
